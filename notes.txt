@@ -1,0 +1,5 @@
+
+NB:
+- Etant donne que le server n'est pas multi-threade, il n'accepte qu'un client à la fois. Autrement dis, il est peu ou prou mono-client et sans etat (Pas de SESSION).
+- 
+

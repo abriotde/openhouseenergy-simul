@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+// TODO: rename the file
+// This is the data for the comunication protocol between client/server with MiniserverAisprid
+
+option go_package = "./messages";
+import "google/protobuf/timestamp.proto";
+
+// The greeting service definition.
+service Greeter {
+  // Sends a greeting
+  rpc SendDataMetric (SendDataMetricRequest) returns (SendDataMetricReply) {}
+  rpc GetAlertHistory (GetAlertHistoryRequest) returns (GetAlertHistoryReply) {}
+}
+
+// The request message.
+message SendDataMetricRequest {
+  string name = 1;
+  int32 value = 2;
+}
+
+// The response message
+message SendDataMetricReply {
+  bool ok = 1;
+  string message = 2;
+}
+
+// The request message.
+message GetAlertHistoryRequest {
+  google.protobuf.Timestamp history = 1;
+}
+
+// The response message
+message GetAlertHistoryReply {
+  bool ok = 1;
+  message Alert {
+    google.protobuf.Timestamp timestamp = 1;
+    string name = 2;
+    int32 value = 3;
+  }
+  repeated Alert alertHistory = 2;
+}
+
+
