@@ -1,10 +1,7 @@
 package main
 
-import "github.com/abriotde/minialertAisprid/cmd"
+import "github.com/abriotde/openhouseenergy-simul/cmd"
 
 func main() {
-    cmd.Execute()
+	cmd.Execute()
 }
-
-
-

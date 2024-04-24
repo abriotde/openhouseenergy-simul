@@ -1,56 +1,61 @@
 /*
-	The goal of this file is to use MiniserverAisprid as CLI (for client and server)
+The goal of this file is to use OpenHouseEnergyModule as CLI (for client and server)
 */
 package cmd
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
-	"github.com/spf13/cobra"
-	"github.com/abriotde/minialertAisprid/server"
-	"github.com/abriotde/minialertAisprid/logger"
-	"bufio"
 	"strings"
-	"errors"
+
+	"github.com/abriotde/openhouseenergy-simul/logger"
+	"github.com/abriotde/openhouseenergy-simul/server"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 const (
 	EXIT_ARGUMENT_ERROR = 1
 )
 
-func runClientCmd(client server.MiniserverAispridClient, args []string) error {
+// LLDP implementation : https://pkg.go.dev/github.com/ksang/gotopo/lldp
+
+func runClientCmd(client server.OpenHouseEnergyModuleClient, args []string) error {
 	var argsLen = len(args)
-	if argsLen<1 {
+	if argsLen < 1 {
 		logger.Logger.Error("You must give comands to client.")
 		os.Exit(EXIT_ARGUMENT_ERROR)
-	} else if argsLen<1 {
+	} else if argsLen == 1 {
 		logger.Logger.Error("Missing arguments.")
 		os.Exit(EXIT_ARGUMENT_ERROR)
 	}
 	var clientCmd = args[0]
-	if clientCmd=="send" {
-		if argsLen<3 {
+	if clientCmd == "send" {
+		if argsLen < 3 {
 			logger.Logger.Error("Missing arguments.")
 			os.Exit(EXIT_ARGUMENT_ERROR)
 		}
 		var varName = args[1]
-		varValue,err := strconv.Atoi(args[2])
+		varValue, err := strconv.Atoi(args[2])
 		if err != nil {
-			logger.Logger.Error("Argument 2 must be an integer for the value : "+args[2]+".")
+			logger.Logger.Error("Argument 2 must be an integer for the value : " + args[2] + ".")
 			return err
 		}
 		// TODO : check varname/varvalue match possible value (No injection)
-        	fmt.Println("Send to server : ", varName, " = ", varValue)
-        	_,err = client.Set(varName, int32(varValue))
-        	if err!=nil {
-        		return err
-        	}
-	} else if clientCmd=="get" {
-		if argsLen>1 && args[1]=="alerts" {
+		fmt.Println("Send to server : ", varName, " = ", varValue)
+		_, err = client.Set(varName, int32(varValue))
+		if err != nil {
+			return err
+		}
+	} else if clientCmd == "get" {
+		if argsLen > 1 && args[1] == "alerts" {
 			// fmt.Println("Call server GetAlertHistory.")
-			alerts,err := client.GetAlertHistory()
-			if err!=nil {
+			alerts, err := client.GetAlertHistory()
+			if err != nil {
 				return err
 			}
 			fmt.Println("Alerts :")
@@ -60,54 +65,69 @@ func runClientCmd(client server.MiniserverAispridClient, args []string) error {
 		} else {
 			logger.Logger.Error("Unimplemented parameter for get.")
 		}
-	} else if clientCmd=="help" {
+	} else if clientCmd == "help" {
 		fmt.Println("Existing commands are : \n - 'send [type] [int_value]' : Implemented types are cpu (Should be less than 80) and battery (Should be beetween 20 and 98) : see monitorer.go for more informations. \n - 'get alerts'\n - help \n - quit : to exit on interactive mode.\n")
 	} else {
-		logger.Logger.Error("Unknown client command : '"+clientCmd+"' possibilities are send|get|help|quit.")
-		return errors.New("Unknown client command : '"+clientCmd+"' possibilities are send|get|help|quit.")
+		logger.Logger.Error("Unknown client command : '" + clientCmd + "' possibilities are send|get|help|quit.")
+		return errors.New("Unknown client command : '" + clientCmd + "' possibilities are send|get|help|quit.")
 	}
-        return nil
+	return nil
+}
+
+type moduleConfiguration struct {
+	ModuleType   string `yaml:"type"`
+	ModuleTypeId int32  `yaml:"typeId"`
+	MaxValue     int32  `yaml:"max"`
+}
+
+func (c *moduleConfiguration) getConfiguration(confFile string) *moduleConfiguration {
+	yamlFile, err := os.ReadFile(confFile)
+	if err != nil {
+		log.Printf("yamlFile.Get err   #%v ", err)
+	}
+	err = yaml.Unmarshal(yamlFile, c)
+	if err != nil {
+		log.Fatalf("Unmarshal: %v", err)
+	}
+	return c
 }
 
 var (
 	// Used for flags.
-	interactive     bool
-	serverURL		string
-	port		string
-	rootCmd = &cobra.Command{
-		Use:   "minialertAisprid",
-		Short: "MinialertAisprid is a minimalistic chalenge to send messages and receive alerts.",
-		Long: `Minialert is a minimalistic chalenge consisting in a client/server which send messages and receive alerts lists
+	interactive   bool
+	coreModuleURL string
+	port          string
+	confFile      string
+	rootCmd       = &cobra.Command{
+		Use:   "openhouseenergy-simul",
+		Short: "openhouseenergy-simul is a simulation for openhouseenrgy manager.",
+		Long: `openhouseenergy-simul is a simulation for openhouseenrgy manager.
 			This is licenced under GPL V3`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if port!="" {
-				file, err := os.OpenFile("log/server.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-				if err != nil {
-					logger.Logger.Out = file
-				}
-				// var server MiniserverAisprid
-				fmt.Println("Run as server mode on port ", port, ".")
-				_, err = server.Listen("localhost:"+port)
-				if err != nil {
-					logger.Logger.Error(" : .") // TODO: + err
-					os.Exit(EXIT_ARGUMENT_ERROR)
-				}
-			} else {
+			if coreModuleURL != "" { // Run as simple module
 				file, err := os.OpenFile("log/client.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 				if err != nil {
 					logger.Logger.Out = file
 				}
-				client, err := server.Connect(serverURL)
+				client, err := server.Connect(coreModuleURL)
 				if err != nil {
-					logger.Logger.Error("Fail to connect to server : "+serverURL+".")
+					logger.Logger.Error("Fail to connect to server : " + coreModuleURL + ".")
+					os.Exit(EXIT_ARGUMENT_ERROR)
+				}
+				var conf moduleConfiguration
+				conf.getConfiguration(confFile)
+				fmt.Println(conf)
+				_, err = client.Set("module", conf.MaxValue)
+				if err != nil {
+					logger.Logger.Error("Fail to signal the module to the server")
 					os.Exit(EXIT_ARGUMENT_ERROR)
 				}
 				if interactive {
-			    		fmt.Println("Interactive mode is enable.")
-			    		reader := bufio.NewReader(os.Stdin)
-			    		run := true
-			    		for run {
-			    			fmt.Print(" $ ")
+					fmt.Println("Interactive mode is enable.")
+					reader := bufio.NewReader(os.Stdin)
+					run := true
+					for run {
+						fmt.Print(" $ ")
 						str, err := reader.ReadString('\n')
 						if err != nil {
 							logger.Logger.Error("Fail read input.")
@@ -116,18 +136,32 @@ var (
 						last := len(str) - 1
 						str = str[:last] // Remove last character : \n
 						args := strings.Split(str, " ")
-						if len(args)>0 && args[0]=="quit" {
+						if len(args) > 0 && args[0] == "quit" {
 							run = false
-			    				fmt.Println("Goodbye.")
+							fmt.Println("Goodbye.")
 							break
 						}
-		    				runClientCmd(client, args)
-			    		}
-			    		// TODO : implement
-			    	} else {
-			    		runClientCmd(client, args)
-			   	}
-			   	client.Close()
+						runClientCmd(client, args)
+					}
+					// TODO : implement
+				} else {
+				}
+				client.Close()
+			} else { // Run as core module mode
+
+			}
+			if port != "" {
+				file, err := os.OpenFile("log/server.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+				if err != nil {
+					logger.Logger.Out = file
+				}
+				// var server OpenHouseEnergyModule
+				fmt.Println("Run as server mode on port ", port, ".")
+				_, err = server.Listen("localhost:" + port)
+				if err != nil {
+					logger.Logger.Error(" : .") // TODO: + err
+					os.Exit(EXIT_ARGUMENT_ERROR)
+				}
 			}
 		},
 	}
@@ -145,8 +179,9 @@ func Execute() {
 // send battery|cpu XX
 // get alerts
 func init() {
-	rootCmd.PersistentFlags().BoolVarP(&interactive, "interactive", "i", false, "For client, it run on interactive mode.")
-	rootCmd.PersistentFlags().StringVarP(&serverURL, "server", "s", "localhost:8080", "The server to connect when in client mode (default). If no port specified, it connect on 8080 port." )
-	rootCmd.PersistentFlags().StringVarP(&port, "port", "p", "", "The port to connect so run it as server.")
-}
+	rootCmd.PersistentFlags().BoolVarP(&interactive, "interactive", "i", false, "It run on interactive mode.")
+	rootCmd.PersistentFlags().StringVarP(&coreModuleURL, "core", "c", "", "The core module url, so it's not a core module.")
+	rootCmd.PersistentFlags().StringVarP(&port, "port", "p", "8080", "The port to connect to listen instructions.")
+	rootCmd.PersistentFlags().StringVarP(&confFile, "module", "m", "", "The file that describe the module.")
 
+}

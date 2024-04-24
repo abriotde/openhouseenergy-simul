@@ -2,9 +2,9 @@
 PROTOC_CMD = protoc
 PROTOC_GRPC_CMD = protoc --plugin=$(shell go env GOPATH)/bin/protoc-gen-go-grpc
 
-all: minialertAisprid
+all: openhouseenergySimul
 
-minialertAisprid: messages/serverProtocol_grpc.pb.go messages/serverProtocol.pb.go
+openhouseenergySimul: messages/serverProtocol_grpc.pb.go messages/serverProtocol.pb.go
 	mkdir -p log
 	go build
 	# mkdir log
@@ -19,6 +19,6 @@ dependencies:
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 clean:
-	rm -f minialertAisprid
+	rm -f openhouseenergySimul
 	rm -f messages/*.go
 

@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 // TODO: rename the file
-// This is the data for the comunication protocol between client/server with MiniserverAisprid
+// This is the data for the comunication protocol between client/server with OpenHouseEnergyModule
 
 option go_package = "./messages";
 import "google/protobuf/timestamp.proto";
