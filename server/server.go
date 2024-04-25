@@ -1,25 +1,21 @@
 package server
 
 import (
-	"bufio"
 	"context"
-	"fmt"
 	"net"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/abriotde/openhouseenergy-simul/logger"
 	"github.com/abriotde/openhouseenergy-simul/messages"
+	"github.com/abriotde/openhouseenergy-simul/module"
 	"github.com/abriotde/openhouseenergy-simul/monitorer"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type OpenHouseEnergyModule struct {
+type OpenHouseEnergyModuleServer struct {
 	listener   net.Listener
 	connection net.Conn
 	connected  bool
+	module     *module.OpenHouseEnergyModule
 }
 
 type server_t struct {
@@ -30,8 +26,8 @@ type server_t struct {
 var monitoring_server server_t
 
 // Launch the server and never stop (Hard kill for stop : TODO : better way: special message?)
-func Listen(port string) (OpenHouseEnergyModule, error) {
-	var server = OpenHouseEnergyModule{connected: false}
+func (module *module.OpenHouseEnergyModule) Listen(port string) (OpenHouseEnergyModuleServer, error) {
+	var server = OpenHouseEnergyModuleServer{connected: false, module: module}
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
 		logger.Logger.Error("Impossible listen on : " + port + ".")
@@ -43,16 +39,17 @@ func Listen(port string) (OpenHouseEnergyModule, error) {
 	return server, nil
 }
 
-// To treat the SendDataMetric request. It will register value of variable at current time but for the moment it register only if it alerts.
-func (s *server_t) SendDataMetric(ctx context.Context, in *messages.SendDataMetricRequest) (*messages.SendDataMetricReply, error) {
-	sValue := strconv.Itoa(int(in.GetValue()))
-	logger.Logger.Info("Received: ", in.GetName(), " = ", sValue)
-	s.monitoring.Log(in.GetName(), in.GetValue())
-	return &messages.SendDataMetricReply{Message: "Set " + in.GetName() + " = " + sValue, Ok: true}, nil
+// To treat the SendModuleDescription request. It will register value of variable at current time but for the moment it register only if it alerts.
+func (s *server_t) SendModuleDescription(ctx context.Context, in *OpenHouseEnergyModuleServer) (*messages.SendModuleDescriptionReply, error) {
+	description := in.module.GetModuleDescription()
+	// sValue := strconv.Itoa(int(description.Id))
+	logger.Logger.Info("Received: ", description.GetType(), " = ", description.Id)
+	// s.monitoring.Log(description.GetType(), sValue)
+	return description, nil
 }
 
 // To treat the GetAlertHistory request.
-func (s *server_t) GetAlertHistory(ctx context.Context, in *messages.GetAlertHistoryRequest) (*messages.GetAlertHistoryReply, error) {
+/* func (s *server_t) GetAlertHistory(ctx context.Context, in *messages.GetAlertHistoryRequest) (*messages.GetAlertHistoryReply, error) {
 	logger.Logger.Info("Ask for alerts.")
 	var alerts []*messages.GetAlertHistoryReply_Alert
 	var nbAlerts = 0
@@ -64,12 +61,12 @@ func (s *server_t) GetAlertHistory(ctx context.Context, in *messages.GetAlertHis
 	}
 	logger.Logger.Info("Have ", strconv.Itoa(nbAlerts), " alerts.")
 	return &messages.GetAlertHistoryReply{AlertHistory: alerts, Ok: true}, nil
-}
+} */
 func init() {
 	// fmt.Println("Init().")
 }
 
-func (server OpenHouseEnergyModule) Run() (OpenHouseEnergyModule, error) {
+func (server OpenHouseEnergyModuleServer) Run() (OpenHouseEnergyModuleServer, error) {
 	monitoring_server.monitoring.Logger = logger.Logger
 	grpcServer := grpc.NewServer()
 	messages.RegisterGreeterServer(grpcServer, &monitoring_server)
@@ -82,7 +79,7 @@ func (server OpenHouseEnergyModule) Run() (OpenHouseEnergyModule, error) {
 }
 
 // Function to test client/server communication with simple ASCII (useless now?)
-func (server OpenHouseEnergyModule) Test() (OpenHouseEnergyModule, error) {
+/* func (server OpenHouseEnergyModule) Test() (OpenHouseEnergyModule, error) {
 	for {
 		// Waiting connection
 		conn, err := server.listener.Accept()
@@ -110,4 +107,4 @@ func (server OpenHouseEnergyModule) Test() (OpenHouseEnergyModule, error) {
 		server.connection.Write([]byte(myTime))
 	}
 	return server, nil
-}
+} */

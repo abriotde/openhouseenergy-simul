@@ -7,15 +7,14 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/abriotde/openhouseenergy-simul/logger"
+	"github.com/abriotde/openhouseenergy-simul/module"
 	"github.com/abriotde/openhouseenergy-simul/server"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -47,24 +46,24 @@ func runClientCmd(client server.OpenHouseEnergyModuleClient, args []string) erro
 		}
 		// TODO : check varname/varvalue match possible value (No injection)
 		fmt.Println("Send to server : ", varName, " = ", varValue)
-		_, err = client.Set(varName, int32(varValue))
+		_, err = client.SendModuleDescription()
 		if err != nil {
 			return err
 		}
 	} else if clientCmd == "get" {
-		if argsLen > 1 && args[1] == "alerts" {
-			// fmt.Println("Call server GetAlertHistory.")
-			alerts, err := client.GetAlertHistory()
-			if err != nil {
-				return err
-			}
-			fmt.Println("Alerts :")
-			for _, alert := range alerts {
-				fmt.Println(" -> ", alert.GetName(), " for value = ", alert.GetValue())
-			}
-		} else {
-			logger.Logger.Error("Unimplemented parameter for get.")
-		}
+		/*	if argsLen > 1 && args[1] == "alerts" {
+				// fmt.Println("Call server GetAlertHistory.")
+				alerts, err := client.GetAlertHistory()
+				if err != nil {
+					return err
+				}
+				fmt.Println("Alerts :")
+				for _, alert := range alerts {
+					fmt.Println(" -> ", alert.GetName(), " for value = ", alert.GetValue())
+				}
+			} else {
+				logger.Logger.Error("Unimplemented parameter for get.")
+			}*/
 	} else if clientCmd == "help" {
 		fmt.Println("Existing commands are : \n - 'send [type] [int_value]' : Implemented types are cpu (Should be less than 80) and battery (Should be beetween 20 and 98) : see monitorer.go for more informations. \n - 'get alerts'\n - help \n - quit : to exit on interactive mode.\n")
 	} else {
@@ -72,24 +71,6 @@ func runClientCmd(client server.OpenHouseEnergyModuleClient, args []string) erro
 		return errors.New("Unknown client command : '" + clientCmd + "' possibilities are send|get|help|quit.")
 	}
 	return nil
-}
-
-type moduleConfiguration struct {
-	ModuleType   string `yaml:"type"`
-	ModuleTypeId int32  `yaml:"typeId"`
-	MaxValue     int32  `yaml:"max"`
-}
-
-func (c *moduleConfiguration) getConfiguration(confFile string) *moduleConfiguration {
-	yamlFile, err := os.ReadFile(confFile)
-	if err != nil {
-		log.Printf("yamlFile.Get err   #%v ", err)
-	}
-	err = yaml.Unmarshal(yamlFile, c)
-	if err != nil {
-		log.Fatalf("Unmarshal: %v", err)
-	}
-	return c
 }
 
 var (
@@ -104,20 +85,18 @@ var (
 		Long: `openhouseenergy-simul is a simulation for openhouseenrgy manager.
 			This is licenced under GPL V3`,
 		Run: func(cmd *cobra.Command, args []string) {
+			var myModule := module.OpenHouseEnergyModule_Init(confFile)
 			if coreModuleURL != "" { // Run as simple module
 				file, err := os.OpenFile("log/client.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 				if err != nil {
 					logger.Logger.Out = file
 				}
-				client, err := server.Connect(coreModuleURL)
+				client, err := myModule.Connect(coreModuleURL)
 				if err != nil {
 					logger.Logger.Error("Fail to connect to server : " + coreModuleURL + ".")
 					os.Exit(EXIT_ARGUMENT_ERROR)
 				}
-				var conf moduleConfiguration
-				conf.getConfiguration(confFile)
-				fmt.Println(conf)
-				_, err = client.Set("module", conf.MaxValue)
+				_, err = client.SendModuleDescription()
 				if err != nil {
 					logger.Logger.Error("Fail to signal the module to the server")
 					os.Exit(EXIT_ARGUMENT_ERROR)
@@ -155,9 +134,9 @@ var (
 				if err != nil {
 					logger.Logger.Out = file
 				}
-				// var server OpenHouseEnergyModule
+				// var server OpenHouseEnergyModuleServer
 				fmt.Println("Run as server mode on port ", port, ".")
-				_, err = server.Listen("localhost:" + port)
+				_, err = myModule.Listen(port)
 				if err != nil {
 					logger.Logger.Error(" : .") // TODO: + err
 					os.Exit(EXIT_ARGUMENT_ERROR)

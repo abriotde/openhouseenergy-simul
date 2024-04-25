@@ -9,36 +9,94 @@ import "google/protobuf/timestamp.proto";
 // The greeting service definition.
 service Greeter {
   // Sends a greeting
-  rpc SendDataMetric (SendDataMetricRequest) returns (SendDataMetricReply) {}
-  rpc GetAlertHistory (GetAlertHistoryRequest) returns (GetAlertHistoryReply) {}
+  rpc SendModuleDescription (SendModuleDescriptionRequest) returns (SendModuleDescriptionReply) {}
+  rpc CoreQuery (CoreQueryRequest) returns (CoreQueryReply) {}
+}
+
+message Cycle {
+  int32 id = 1;
+  int32 duration = 2;
+  int32 stepInSeconds = 3;
+  repeated int32 cycle = 4 [packed=true];
+  repeated int32 stopable = 5 [packed=true];
+  google.protobuf.Timestamp timeout = 6; // Time when we must have reach minGoal (If 0, we should never go under)
+}
+message ElectricitySupplierCaracteristics {
+  int32 maxTimeOff = 1;
+  int32 stepInSeconds = 2; // Step duration in seconds beetween to step on futur price
+  repeated int32 prices = 3 [packed=true]; // futur price
+  repeated int32 probability = 4 [packed=true]; // probability that the price will change
+}
+message BatteryCaracteristics {
+  int32 capacity = 1;
+  int32 efficiency = 2;
+  int32 lowLevel = 3; // Level under wich we should avoid to go
+  int32 hightLevel = 4; // Level above wich we should avoid to go
+  int32 usageLimitation = 5; // A number to note how much we should avoid to use it : 0 never, 127 nevermind
+}
+message Stopable {
+  int32 avgPower = 1;
+  int32 maxTimeOff = 2; // May depends on temperature outside and on how much it is open.
+  int32 stopPenalty = 3; // When stop too-long, it may consume more, this indicate the number of Watt it will over-consume if stoped maxTimeOff
+  int32 usageLimitation = 4; // A number to note how much we should avoid to stop it : 0 never, 127 nevermind
+}
+message ChargingSystem {
+  int32 capacity = 1; // Capacity in Watt
+  int32 chargingState = 2; // Level of charging.
+  int32 minGoal = 3; // Minimum charging level to acquire
+  google.protobuf.Timestamp timeout = 4; // Time when we must have reach minGoal (If 0, we should never go under)
 }
 
 // The request message.
-message SendDataMetricRequest {
-  string name = 1;
-  int32 value = 2;
-}
-
-// The response message
-message SendDataMetricReply {
-  bool ok = 1;
-  string message = 2;
-}
-
-// The request message.
-message GetAlertHistoryRequest {
-  google.protobuf.Timestamp history = 1;
-}
-
-// The response message
-message GetAlertHistoryReply {
-  bool ok = 1;
-  message Alert {
-    google.protobuf.Timestamp timestamp = 1;
-    string name = 2;
-    int32 value = 3;
+message SendModuleDescriptionRequest {
+  int32 id = 1;
+  enum ModuleType {
+    SOLARPANEL = 0;
+    BATTERY = 1;
+    WASHINGMACHINE = 2; // Wasing-machine, Dishwasher, Dryer
+    FREEZER = 3; // Freezer, Fridge, Mechanical ventilation
+    ELECTRICITY_SUPPLIER = 4;
+	WATER_HEATER = 5; // Water-Heater, Car
   }
-  repeated Alert alertHistory = 2;
+  ModuleType moduleType = 2;
+  int32 maxPower = 3;
+  oneof test_oneof {
+    Cycle cycles = 4; // Case WASHINGMACHINE,
+	Stopable stopable = 5; // Case FREEZER
+	ChargingSystem charging = 6; // Case WATER_HEATER
+	ElectricitySupplierCaracteristics electricitySupplier = 7; // Case ELECTRICITY_SUPPLIER
+	BatteryCaracteristics batteryCaracteristics = 8; // Case Battery
+  }
+}
+
+// The response message
+message SendModuleDescriptionReply {
+  bool ok = 1;
+  int32 moduleId = 2;
+}
+
+
+
+// The request message.
+message CoreQueryRequest {
+  int32 requestId = 1;
+  int32 moduleId = 2;
+  enum QueryType {
+    QUERY_START = 0;
+    QUERY_STOP = 1;
+    QUERY_SEND_DESCRIPTION = 2;
+  }
+  QueryType queryId = 3;
+  string query = 4;
+  int32 cycleId = 5;
+}
+
+// The response message
+message CoreQueryReply {
+  int32 requestId = 1;
+  bool ok = 2;
+  int32 power = 3;
+  string message = 4;
 }
 
 
