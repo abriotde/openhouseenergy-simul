@@ -1,4 +1,4 @@
-package server
+package module
 
 import (
 	"fmt"
@@ -6,22 +6,14 @@ import (
 	"os"
 
 	"github.com/abriotde/openhouseenergy-simul/messages"
+	"github.com/abriotde/openhouseenergy-simul/server"
 	"gopkg.in/yaml.v3"
 )
 
 type OpenHouseEnergyModule interface {
 	GetModuleDescription() *messages.SendModuleDescriptionRequest
-}
-type OpenHouseEnergyModuleSolarPannel struct {
-	id       int32
-	maxPower int32
-}
-
-func (pannel OpenHouseEnergyModuleSolarPannel) GetModuleDescription() *messages.SendModuleDescriptionRequest {
-	description := messages.SendModuleDescriptionRequest{
-		Id:         pannel.id,
-		ModuleType: messages.SendModuleDescriptionRequest_SOLARPANEL}
-	return &description
+	Listen(port int32) (server.OpenHouseEnergyModuleServer, error)
+	Connect(url string) (server.OpenHouseEnergyModuleClient, error)
 }
 
 type moduleConfiguration struct {
@@ -43,7 +35,7 @@ func (c *moduleConfiguration) getConfiguration(confFile string) *moduleConfigura
 	return c
 }
 
-func OpenHouseEnergyModule_Init(confFile string) OpenHouseEnergyModule {
+func New(confFile string) OpenHouseEnergyModule {
 	var conf moduleConfiguration
 	conf.getConfiguration(confFile)
 	fmt.Println("Load conf : ", conf)

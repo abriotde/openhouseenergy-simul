@@ -3,10 +3,10 @@ package server
 import (
 	"context"
 	"net"
+	"strconv"
 
 	"github.com/abriotde/openhouseenergy-simul/logger"
 	"github.com/abriotde/openhouseenergy-simul/messages"
-	"github.com/abriotde/openhouseenergy-simul/module"
 	"github.com/abriotde/openhouseenergy-simul/monitorer"
 	"google.golang.org/grpc"
 )
@@ -15,7 +15,7 @@ type OpenHouseEnergyModuleServer struct {
 	listener   net.Listener
 	connection net.Conn
 	connected  bool
-	module     *module.OpenHouseEnergyModule
+	modules    []int32
 }
 
 type server_t struct {
@@ -26,26 +26,27 @@ type server_t struct {
 var monitoring_server server_t
 
 // Launch the server and never stop (Hard kill for stop : TODO : better way: special message?)
-func (module *module.OpenHouseEnergyModule) Listen(port string) (OpenHouseEnergyModuleServer, error) {
-	var server = OpenHouseEnergyModuleServer{connected: false, module: module}
-	listener, err := net.Listen("tcp", port)
+func Listen(port int32) (OpenHouseEnergyModuleServer, error) {
+	var server = OpenHouseEnergyModuleServer{connected: false}
+	var portStr = strconv.Itoa(int(port))
+	listener, err := net.Listen("tcp", "localhost:"+portStr)
 	if err != nil {
-		logger.Logger.Error("Impossible listen on : " + port + ".")
+		logger.Logger.Error("OpenHouseEnergyModuleServer : Impossible listen on : " + portStr + ".")
 		return server, err
 	}
 	defer listener.Close()
 	server.listener = listener
+	server.connected = true
 	server.Run()
 	return server, nil
 }
 
 // To treat the SendModuleDescription request. It will register value of variable at current time but for the moment it register only if it alerts.
-func (s *server_t) SendModuleDescription(ctx context.Context, in *OpenHouseEnergyModuleServer) (*messages.SendModuleDescriptionReply, error) {
-	description := in.module.GetModuleDescription()
+func (s *server_t) SendModuleDescription(ctx context.Context, in *messages.SendModuleDescriptionRequest) (*messages.SendModuleDescriptionReply, error) {
 	// sValue := strconv.Itoa(int(description.Id))
-	logger.Logger.Info("Received: ", description.GetType(), " = ", description.Id)
+	logger.Logger.Info("Received: ", in.GetModuleType(), " from ", in.Id)
 	// s.monitoring.Log(description.GetType(), sValue)
-	return description, nil
+	return &messages.SendModuleDescriptionReply{Ok: true, ModuleId: in.Id}, nil
 }
 
 // To treat the GetAlertHistory request.

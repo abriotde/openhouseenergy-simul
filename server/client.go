@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/abriotde/openhouseenergy-simul/logger"
@@ -57,12 +58,13 @@ func (client OpenHouseEnergyModuleClient) Close() {
 } */
 
 // Set the current value of the variable name registred on the server.
-func (client OpenHouseEnergyModuleClient) SendModuleDescription() (string, error) {
+func (client OpenHouseEnergyModuleClient) SendModuleDescription(description *messages.SendModuleDescriptionRequest) (string, error) {
 	// fmt.Println("Set to server : ", varName, " = ", varValue)
 	// Contact the server and print out its response.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	r, err := client.grpcConnection.SendModuleDescription(ctx, &messages.SendModuleDescriptionRequest{})
+	fmt.Println("client.SendModuleDescription : ", description) // TODO: + err
+	r, err := client.grpcConnection.SendModuleDescription(ctx, description)
 	if err != nil {
 		logger.Logger.Error("could not SendModuleDescription : : ") // TODO: + err
 		return "KO", err

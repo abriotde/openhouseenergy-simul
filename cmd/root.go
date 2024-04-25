@@ -34,7 +34,7 @@ func runClientCmd(client server.OpenHouseEnergyModuleClient, args []string) erro
 	}
 	var clientCmd = args[0]
 	if clientCmd == "send" {
-		if argsLen < 3 {
+		/* if argsLen < 3 {
 			logger.Logger.Error("Missing arguments.")
 			os.Exit(EXIT_ARGUMENT_ERROR)
 		}
@@ -49,7 +49,7 @@ func runClientCmd(client server.OpenHouseEnergyModuleClient, args []string) erro
 		_, err = client.SendModuleDescription()
 		if err != nil {
 			return err
-		}
+		} */
 	} else if clientCmd == "get" {
 		/*	if argsLen > 1 && args[1] == "alerts" {
 				// fmt.Println("Call server GetAlertHistory.")
@@ -85,7 +85,12 @@ var (
 		Long: `openhouseenergy-simul is a simulation for openhouseenrgy manager.
 			This is licenced under GPL V3`,
 		Run: func(cmd *cobra.Command, args []string) {
-			var myModule := module.OpenHouseEnergyModule_Init(confFile)
+			var myModule module.OpenHouseEnergyModule
+			if confFile != "" { // Run as simple module
+				myModule = module.New(confFile)
+			} else {
+				fmt.Println("Run as core module.")
+			}
 			if coreModuleURL != "" { // Run as simple module
 				file, err := os.OpenFile("log/client.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 				if err != nil {
@@ -96,7 +101,7 @@ var (
 					logger.Logger.Error("Fail to connect to server : " + coreModuleURL + ".")
 					os.Exit(EXIT_ARGUMENT_ERROR)
 				}
-				_, err = client.SendModuleDescription()
+				_, err = client.SendModuleDescription(myModule.GetModuleDescription())
 				if err != nil {
 					logger.Logger.Error("Fail to signal the module to the server")
 					os.Exit(EXIT_ARGUMENT_ERROR)
@@ -136,7 +141,12 @@ var (
 				}
 				// var server OpenHouseEnergyModuleServer
 				fmt.Println("Run as server mode on port ", port, ".")
-				_, err = myModule.Listen(port)
+				portInt, err := strconv.Atoi(port)
+				if err != nil {
+					logger.Logger.Error(" : .") // TODO: + err
+					os.Exit(EXIT_ARGUMENT_ERROR)
+				}
+				_, err = server.Listen(int32(portInt))
 				if err != nil {
 					logger.Logger.Error(" : .") // TODO: + err
 					os.Exit(EXIT_ARGUMENT_ERROR)
